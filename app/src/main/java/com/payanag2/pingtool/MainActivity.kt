@@ -1,7 +1,9 @@
 package com.payanag2.pingtool
 
+import android.animation.ValueAnimator
 import android.graphics.Color
 import android.os.Bundle
+import android.view.animation.DecelerateInterpolator
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -59,27 +61,30 @@ class MainActivity : AppCompatActivity() {
         root.addView(stats)
         root.addView(scroll)
         setContentView(root)
-
-        // Scroll only after the TextView has actually been laid out.
-        // This fixes the case where append() changes the height after the
-        // previous scroll command has already run.
-        output.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            if (job?.isActive == true) {
-                scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
-            }
-        }
-
         start.setOnClickListener { startPing() }
         stop.setOnClickListener { stopPing() }
     }
 
-    private fun scrollToLatest() {
-        output.requestLayout()
+    private fun smoothScrollToLatest() {
         scroll.post {
-            scroll.fullScroll(ScrollView.FOCUS_DOWN)
-            scroll.postDelayed({
-                scroll.fullScroll(ScrollView.FOCUS_DOWN)
-            }, 80)
+            val target = (output.height - scroll.height).coerceAtLeast(0)
+            val startY = scroll.scrollY
+            if (target <= startY) return@post
+            ValueAnimator.ofInt(startY, target).apply {
+                duration = 280L
+                interpolator = DecelerateInterpolator()
+                addUpdateListener { scroll.scrollTo(0, it.animatedValue as Int) }
+                start()
+            }
+        }
+    }
+
+    private fun addLine(line: String) {
+        output.append(line)
+        output.post {
+            output.alpha = 0.72f
+            output.animate().alpha(1f).setDuration(140L).start()
+            smoothScrollToLatest()
         }
     }
 
@@ -93,7 +98,7 @@ class MainActivity : AppCompatActivity() {
         val target = host.text.toString().trim()
         if (target.isEmpty()) return
         output.text = "Pinging $target with 32 bytes of data\n\n"
-        scrollToLatest()
+        smoothScrollToLatest()
         job = lifecycleScope.launch(Dispatchers.IO) {
             while (isActive) {
                 sent++
@@ -109,15 +114,14 @@ class MainActivity : AppCompatActivity() {
                         min = minOf(min, ms)
                         max = maxOf(max, ms)
                         total += ms
-                        output.append("Reply from $target: time=${ms}ms\n")
+                        addLine("Reply from $target: time=${ms}ms\n")
                     } else {
-                        output.append("Request timed out.\n")
+                        addLine("Request timed out.\n")
                     }
                     val loss = (sent - received) * 100 / sent
                     val avg = if (received == 0) 0 else total / received
                     val minValue = if (min == Long.MAX_VALUE) 0 else min
                     stats.text = "Packets: $sent  Received: $received  Loss: $loss%  Min/Avg/Max: $minValue/$avg/$max ms"
-                    scrollToLatest()
                 }
                 delay(1000)
             }
