@@ -59,16 +59,27 @@ class MainActivity : AppCompatActivity() {
         root.addView(stats)
         root.addView(scroll)
         setContentView(root)
+
+        // Scroll only after the TextView has actually been laid out.
+        // This fixes the case where append() changes the height after the
+        // previous scroll command has already run.
+        output.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            if (job?.isActive == true) {
+                scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
+            }
+        }
+
         start.setOnClickListener { startPing() }
         stop.setOnClickListener { stopPing() }
     }
 
     private fun scrollToLatest() {
-        // Wait until TextView has completed its layout, then move the viewport
-        // to the actual bottom. This is more reliable than fullScroll() alone.
+        output.requestLayout()
         scroll.post {
-            scroll.scrollTo(0, output.height)
-            scroll.postDelayed({ scroll.scrollTo(0, output.height) }, 50)
+            scroll.fullScroll(ScrollView.FOCUS_DOWN)
+            scroll.postDelayed({
+                scroll.fullScroll(ScrollView.FOCUS_DOWN)
+            }, 80)
         }
     }
 
