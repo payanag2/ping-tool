@@ -63,6 +63,15 @@ class MainActivity : AppCompatActivity() {
         stop.setOnClickListener { stopPing() }
     }
 
+    private fun scrollToLatest() {
+        // Wait until TextView has completed its layout, then move the viewport
+        // to the actual bottom. This is more reliable than fullScroll() alone.
+        scroll.post {
+            scroll.scrollTo(0, output.height)
+            scroll.postDelayed({ scroll.scrollTo(0, output.height) }, 50)
+        }
+    }
+
     private fun startPing() {
         stopPing()
         sent = 0
@@ -73,7 +82,7 @@ class MainActivity : AppCompatActivity() {
         val target = host.text.toString().trim()
         if (target.isEmpty()) return
         output.text = "Pinging $target with 32 bytes of data\n\n"
-        scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
+        scrollToLatest()
         job = lifecycleScope.launch(Dispatchers.IO) {
             while (isActive) {
                 sent++
@@ -97,8 +106,7 @@ class MainActivity : AppCompatActivity() {
                     val avg = if (received == 0) 0 else total / received
                     val minValue = if (min == Long.MAX_VALUE) 0 else min
                     stats.text = "Packets: $sent  Received: $received  Loss: $loss%  Min/Avg/Max: $minValue/$avg/$max ms"
-                    // Keep the newest ping visible automatically, like a terminal window.
-                    scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
+                    scrollToLatest()
                 }
                 delay(1000)
             }
