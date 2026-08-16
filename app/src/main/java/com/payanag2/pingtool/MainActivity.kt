@@ -11,6 +11,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var host: EditText
     private lateinit var output: TextView
     private lateinit var stats: TextView
+    private lateinit var scroll: ScrollView
     private var job: Job? = null
     private var sent = 0
     private var received = 0
@@ -48,8 +49,9 @@ class MainActivity : AppCompatActivity() {
             textSize = 14f
             setTextIsSelectable(true)
         }
-        val scroll = ScrollView(this).apply {
+        scroll = ScrollView(this).apply {
             addView(output)
+            isFillViewport = true
             layoutParams = LinearLayout.LayoutParams(-1, 0, 1f)
         }
         root.addView(host)
@@ -71,6 +73,7 @@ class MainActivity : AppCompatActivity() {
         val target = host.text.toString().trim()
         if (target.isEmpty()) return
         output.text = "Pinging $target with 32 bytes of data\n\n"
+        scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
         job = lifecycleScope.launch(Dispatchers.IO) {
             while (isActive) {
                 sent++
@@ -94,6 +97,8 @@ class MainActivity : AppCompatActivity() {
                     val avg = if (received == 0) 0 else total / received
                     val minValue = if (min == Long.MAX_VALUE) 0 else min
                     stats.text = "Packets: $sent  Received: $received  Loss: $loss%  Min/Avg/Max: $minValue/$avg/$max ms"
+                    // Keep the newest ping visible automatically, like a terminal window.
+                    scroll.post { scroll.fullScroll(ScrollView.FOCUS_DOWN) }
                 }
                 delay(1000)
             }
