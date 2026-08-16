@@ -1,9 +1,7 @@
 package com.payanag2.pingtool
 
-import android.animation.ValueAnimator
 import android.graphics.Color
 import android.os.Bundle
-import android.view.animation.DecelerateInterpolator
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -68,24 +66,14 @@ class MainActivity : AppCompatActivity() {
     private fun smoothScrollToLatest() {
         scroll.post {
             val target = (output.height - scroll.height).coerceAtLeast(0)
-            val startY = scroll.scrollY
-            if (target <= startY) return@post
-            ValueAnimator.ofInt(startY, target).apply {
-                duration = 280L
-                interpolator = DecelerateInterpolator()
-                addUpdateListener { scroll.scrollTo(0, it.animatedValue as Int) }
-                start()
-            }
+            if (target == scroll.scrollY) return@post
+            scroll.smoothScrollTo(0, target)
         }
     }
 
     private fun addLine(line: String) {
         output.append(line)
-        output.post {
-            output.alpha = 0.72f
-            output.animate().alpha(1f).setDuration(140L).start()
-            smoothScrollToLatest()
-        }
+        output.post { smoothScrollToLatest() }
     }
 
     private fun startPing() {
@@ -98,14 +86,11 @@ class MainActivity : AppCompatActivity() {
         val target = host.text.toString().trim()
         if (target.isEmpty()) return
         output.text = "Pinging $target with 32 bytes of data\n\n"
-        smoothScrollToLatest()
         job = lifecycleScope.launch(Dispatchers.IO) {
             while (isActive) {
                 sent++
                 val t = System.nanoTime()
-                val process = Runtime.getRuntime().exec(
-                    arrayOf("/system/bin/ping", "-c", "1", "-W", "1", target)
-                )
+                val process = Runtime.getRuntime().exec(arrayOf("/system/bin/ping", "-c", "1", "-W", "1", target))
                 val code = process.waitFor()
                 val ms = (System.nanoTime() - t) / 1_000_000
                 withContext(Dispatchers.Main) {
@@ -115,9 +100,7 @@ class MainActivity : AppCompatActivity() {
                         max = maxOf(max, ms)
                         total += ms
                         addLine("Reply from $target: time=${ms}ms\n")
-                    } else {
-                        addLine("Request timed out.\n")
-                    }
+                    } else addLine("Request timed out.\n")
                     val loss = (sent - received) * 100 / sent
                     val avg = if (received == 0) 0 else total / received
                     val minValue = if (min == Long.MAX_VALUE) 0 else min
